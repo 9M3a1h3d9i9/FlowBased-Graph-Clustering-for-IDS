@@ -1,89 +1,77 @@
-# FlowBased-Graph-Clustering-for-IDS
+# Flow-Based Graph Clustering for Network Intrusion Detection
 
-# خوشه بندی گراف مبتنی بر جریان برای تشخیص ناهنجاری در شبکه
-## (Flow-Based Graph Clustering for Network Intrusion Detection)
+> Graph-based anomaly detection (تشخیص ناهنجاری) for network traffic using similarity graphs, clustering, and flow-based cluster refinement.
 
-این پروژه برای درس **"بهینه‌سازی شبکه‌های پیشرفته"** انجام شده و به بررسی و پیاده‌سازی الگوریتم‌های پیشرفته خوشه‌بندی گراف جهت تشخیص ناهنجاری در ترافیک شبکه می‌پردازد. هدف اصلی، نمایش برتری روش‌های مبتنی بر گراف و الگوریتم‌های بهبود خوشه (Cluster Improvement) در مقایسه با روش‌های خوشه‌بندی سنتی است.
+## Overview
 
----
+This project investigates whether network-flow data can benefit from a graph representation before clustering. It was developed as an Advanced Network Optimization course project and connects machine learning with graph algorithms.
 
-### ** شرح پروژه**
+## Pipeline
 
-در این پروژه، ما از دیتاست معروف **NSL-KDD** که شامل ترافیک شبکه است، استفاده می‌کنیم. چالش اصلی این است که این دیتاست به صورت جدولی بوده و ساختار گرافی ندارد. ما با طی کردن مراحل زیر، این دیتاست را برای یک تحلیل پیشرفته آماده می‌کنیم:
+```text
+NSL-KDD
+   ↓
+Preprocessing
+   ↓
+Feature Encoding
+   ↓
+Baseline: K-Means + PCA
+   ↓
+k-NN Similarity Graph
+   ↓
+Spectral Clustering
+   ↓
+Flow-Based Refinement
+   ├── MQI
+   └── LFI
+   ↓
+Evaluation
+```
 
-1.  **تبدیل داده به گراف:** داده‌های جدولی به یک گراف شباهت مبتنی بر k-نزدیک‌ترین همسایه (k-NN) تبدیل می‌شوند.
-2.  **خوشه‌بندی گرافی:** الگوریتم خوشه‌بندی طیفی (Spectral Clustering) برای جداسازی ترافیک نرمال از ترافیک حمله به کار گرفته می‌شود.
-3.  **بهبود خوشه‌بندی:** با الهام از مقاله "Flow-based Algorithms for Improving Clusters"، از الگوریتم‌های مبتنی بر شبکه جریان مانند **MQI** و **LFI** برای پالایش و بهبود خوشه‌های شناسایی‌شده استفاده می‌شود.
+## Methods
 
----
+- Pandas / NumPy preprocessing
+- One-hot encoding for categorical features
+- PCA for the baseline representation
+- K-Means baseline
+- k-Nearest Neighbors similarity graph
+- Spectral Clustering
+- Flow-based cluster improvement using MQI and LFI
 
-### ** دیتاست**
+## Dataset
 
-از دیتاست **NSL-KDD** استفاده شده است که نسخه‌ای بهبودیافته از دیتاست KDD Cup '99 می‌باشد. این مجموعه داده شامل اتصالات شبکه با ۴۱ ویژگی مختلف است که هر کدام به عنوان "نرمال" یا نوع خاصی از "حمله" برچسب‌گذاری شده‌اند.
+The project uses **NSL-KDD**, an intrusion-detection benchmark derived from KDD Cup '99. The dataset is not redistributed by this repository.
 
----
+## Reported Experiment
 
-### ** متدولوژی و پایپ‌لاین پروژه**
+The existing project reports the following F1 scores from its previous experiment:
 
-1.  **بارگذاری و پیش‌پردازش:** داده‌ها با استفاده از کتابخانه `Pandas` بارگذاری شده و ویژگی‌های غیرعددی از طریق One-Hot Encoding به فرمت عددی تبدیل می‌شوند.
-2.  **خوشه‌بندی پایه (Baseline):** الگوریتم `K-Means` روی داده‌های خام (پس از کاهش ابعاد با PCA) به عنوان یک مدل پایه اجرا می‌شود.
-3.  **ساخت گراف:** یک گراف شباهت با استفاده از `k-Nearest Neighbors` ساخته می‌شود که در آن هر اتصال شبکه یک گره است و یال‌ها نشان‌دهنده شباهت بین اتصالات هستند.
-4.  **خوشه‌بندی مبتنی بر گراف:** الگوریتم `Spectral Clustering` روی ماتریس مجاورت گراف برای تفکیک خوشه‌ها اجرا می‌شود.
-5.  **بهبود خوشه‌ها:** خوشه‌های خروجی از مرحله قبل با استفاده از کتابخانه `localgraphclustering` و الگوریتم‌های **MQI** و **LFI** بهبود داده می‌شوند.
+| Method | F1 |
+|---|---:|
+| K-Means | 0.8806 |
+| Spectral Clustering | 0.9252 |
+| MQI | 0.9255 |
+| LFI | 0.9416 |
 
----
+These values are retained as **previously reported project results**; they are not presented as a newly reproduced experiment in the current repository state.
 
-### ** نتایج**
+## Status
 
-نتایج نشان‌دهنده بهبود قابل توجه عملکرد در هر مرحله از پایپ‌لاین است. مقایسه امتیاز **F1-Score** برای هر روش در جدول و نمودار زیر خلاصه شده است:
+**Completed course/research prototype with room for reproducibility improvements.**
 
-| Algorithm                       | F1-Score |
-| ------------------------------- | :------: |
-| K-Means (on raw data)           |  0.8806  |
-| Spectral Clustering (on graph)  |  0.9252  |
-| MQI-Improved                    |  0.9255  |
-| LFI-Improved                    |  0.9416  |
+## Future Work
 
-![مقایسه الگوریتم‌های خوشه‌بندی] **نتیجه‌گیری کلیدی:**
-- تبدیل داده به گراف، عملکرد خوشه‌بندی را به طور قابل توجهی بهبود می‌بخشد (جهش از 0.88 به 0.92).
-- الگوریتم‌های بهبود خوشه مبتنی بر جریان (به خصوص LFI)، دقت خوشه‌بندی را بیش از پیش افزایش می‌دهند.
+- Rebuild the experiment as a command-line pipeline.
+- Add automated tests for graph construction and clustering.
+- Add seed/configuration control.
+- Separate train/evaluation data handling more clearly.
+- Add precision, recall, confusion matrix, and class-wise metrics.
+- Document computational cost and scalability.
 
----
+## Technology
 
-### ** نصب و اجرا**
+Python • NumPy • Pandas • Scikit-learn • NetworkX • Matplotlib • localgraphclustering
 
-برای اجرای این پروژه، مراحل زیر را دنبال کنید:
+## Author
 
-1.  **کلون کردن ریپازیتوری:**
-    ```bash
-    git clone [https://github.com/YourUsername/FlowBased-Graph-Clustering-for-IDS.git](https://github.com/YourUsername/FlowBased-Graph-Clustering-for-IDS.git)
-    cd FlowBased-Graph-Clustering-for-IDS
-    ```
-
-2.  **ایجاد و فعال‌سازی محیط مجازی:**
-    ```bash
-    python -m venv venv
-    venv\Scripts\activate
-    ```
-
-3.  **نصب بسته‌های مورد نیاز:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4.  **اجرای نوت‌بوک:**
-    محیط Jupyter را اجرا کرده و فایل نوت‌بوک (`.ipynb`) پروژه را باز کنید.
-    ```bash
-    jupyter lab
-    ```
-
----
-
-### ** تکنولوژی‌های استفاده شده**
-
-- Python 3.x
-- Pandas & NumPy
-- Scikit-learn
-- NetworkX
-- Matplotlib
-- localgraphclustering
+Mohammad Mahdi Shafighi — M.Sc. Artificial Intelligence
