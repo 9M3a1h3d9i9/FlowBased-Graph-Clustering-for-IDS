@@ -11,6 +11,9 @@ class ExperimentConfig:
     n_neighbors: int = 15
     n_clusters: int = 2
     symmetrization: str = "union"
+    mutual: bool = False
+    weighting: str = "binary"
+    rbf_sigma: float | None = None
 
     def validate(self) -> None:
         if self.sample_size <= 0:
@@ -23,3 +26,7 @@ class ExperimentConfig:
             raise ValueError("n_clusters must be at least 2")
         if self.symmetrization not in {"union", "mean"}:
             raise ValueError("symmetrization must be 'union' or 'mean'")
+        if self.weighting not in {"binary", "rbf"}:
+            raise ValueError("weighting must be 'binary' or 'rbf'")
+        if self.rbf_sigma is not None and self.rbf_sigma <= 0:
+            raise ValueError("rbf_sigma must be positive when provided")
