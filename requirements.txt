@@ -3,10 +3,10 @@ pandas==2.3.2
 scipy==1.16.2
 scikit-learn==1.7.2
 networkx==3.5
-localgraphclustering==0.6.1
+# Build LocalGraphClustering from source so its native flow library is compiled
+# for the CI runner instead of using the broken prebuilt 0.6.1 wheel.
+localgraphclustering @ git+https://github.com/kfoynt/LocalGraphClustering.git@a6325350997932d548a876deb259c2387fc2c809
 matplotlib==3.10.6
 seaborn==0.13.2
 jupyterlab==4.4.7
 pytest==8.4.2
-# localgraphclustering 0.6.1 declares the deprecated `sklearn` distribution.
-# Install the modern distribution explicitly; pip otherwise aborts on `sklearn`.
