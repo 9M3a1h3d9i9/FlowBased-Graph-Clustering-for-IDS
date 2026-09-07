@@ -24,27 +24,14 @@ def _graph_local(A: csr_matrix):
 
 
 def mqi_refine(A: csr_matrix, ref_nodes: Iterable[int]) -> tuple[np.ndarray, float]:
-    """Run the published Max Flow Quotient-cut Improvement (MQI) algorithm.
-
-    Parameters
-    ----------
-    A:
-        Symmetric sparse adjacency matrix.
-    ref_nodes:
-        Seed/reference nodes defining the local region to improve.
-
-    Returns
-    -------
-    cluster_nodes, conductance
-        The node indices returned by MQI and their graph conductance.
-    """
-    from localgraphclustering import MQI
-
+    """Run the published Max Flow Quotient-cut Improvement (MQI) algorithm."""
     seeds = np.asarray(sorted(set(int(i) for i in ref_nodes)), dtype=np.int64)
     if seeds.size == 0:
         raise ValueError("ref_nodes must contain at least one node")
     if np.any(seeds < 0) or np.any(seeds >= A.shape[0]):
         raise ValueError("ref_nodes contains an invalid node index")
+
+    from localgraphclustering import MQI
 
     result = MQI(_graph_local(A), seeds.tolist())
     cluster_nodes = np.asarray(result[0], dtype=np.int64)
@@ -60,13 +47,13 @@ def simple_local_refine(
     check_connectivity: bool = True,
 ) -> tuple[np.ndarray, float]:
     """Run LocalGraphClustering's strongly-local flow-based SimpleLocal method."""
-    from localgraphclustering import SimpleLocal
-
     seeds = np.asarray(sorted(set(int(i) for i in ref_nodes)), dtype=np.int64)
     if seeds.size == 0:
         raise ValueError("ref_nodes must contain at least one node")
     if np.any(seeds < 0) or np.any(seeds >= A.shape[0]):
         raise ValueError("ref_nodes contains an invalid node index")
+
+    from localgraphclustering import SimpleLocal
 
     result = SimpleLocal(
         _graph_local(A),
