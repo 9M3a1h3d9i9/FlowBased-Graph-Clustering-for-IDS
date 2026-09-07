@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main, refactor/research-grade-pipeline]
+  pull_request:
+
+env:
+  # localgraphclustering 0.6.1 depends on the deprecated `sklearn` shim.
+  # scikit-learn itself is pinned in requirements.txt.
+  SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL: "True"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run test suite
+        run: python -m pytest -q
