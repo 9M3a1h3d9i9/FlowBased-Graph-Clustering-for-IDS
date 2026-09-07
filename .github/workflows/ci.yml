@@ -5,6 +5,11 @@ on:
     branches: [main, refactor/research-grade-pipeline]
   pull_request:
 
+env:
+  # localgraphclustering 0.6.1 depends on the deprecated `sklearn` shim.
+  # scikit-learn itself is pinned in requirements.txt.
+  SKLEARN_ALLOW_DEPRECATED_SKLEARN_PACKAGE_INSTALL: "True"
+
 jobs:
   test:
     runs-on: ubuntu-latest
