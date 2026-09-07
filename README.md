@@ -1,8 +1,8 @@
 # Flow-Based Graph Clustering for Network Intrusion Detection
 
-> A reproducible research pipeline for **network intrusion detection (IDS)** using feature-space similarity graphs, clustering, and flow-based local graph refinement.
+> A reproducible research pipeline for **network intrusion detection (IDS)** using feature-space similarity graphs, clustering, and flow-based local refinement.
 
-urlGitHub Repositoryhttps://github.com/9M3a1h3d9i9/FlowBased-Graph-Clustering-for-IDS
+[GitHub Repository](https://github.com/9M3a1h3d9i9/FlowBased-Graph-Clustering-for-IDS)
 
 ## 1. Research Objective
 
@@ -12,7 +12,7 @@ The project asks a concrete question:
 
 The current graph is a **feature-similarity graph**: each node is one network-flow record and edges connect records that are close in feature space. It is therefore not a communication-topology graph whose nodes are IP addresses.
 
-This distinction is important for both scientific reproducibility and future real-world deployment.
+This distinction is important for scientific reproducibility and for the later real-world formulation.
 
 ## 2. Current Pipeline
 
@@ -34,62 +34,78 @@ NSL-KDD
           ▼              ▼
       K-Means       Spectral Clustering
           │              │
-          │              ▼
-          │       Flow-based refinement
-          │        (next implementation stage)
-          │
-          └──────────────┬──────────────┘
-                         ▼
-                  IDS Evaluation
+          └──────┬───────┘
+                 ▼
+        Unsupervised seed set
+                 │
+                 ▼
+        True flow-based MQI
+                 │
+                 ▼
+             IDS metrics
 ```
 
-## 3. What Was Improved in Phase 1
+## 3. Phase 1 — Reproducibility and Correctness
 
-The repository is being migrated from a notebook-centered prototype toward a research-grade, modular implementation.
+The repository is being migrated from a notebook-centered prototype toward a modular, testable implementation.
 
-### Added source modules
+Implemented modules:
 
 - `src/config.py` — centralized experiment configuration and validation.
 - `src/preprocessing.py` — explicit NSL-KDD loading, encoding, scaling and PCA utilities.
 - `src/graph.py` — k-NN graph construction with explicit symmetrization and graph diagnostics.
 - `src/clustering.py` — reusable K-Means and Spectral Clustering baselines.
 - `src/evaluation.py` — Precision, Recall, F1, Specificity, FPR, Balanced Accuracy, ARI and NMI.
-- `tests/test_graph.py` — initial tests for graph symmetry and graph statistics.
+- `src/flow_refinement.py` — integration with the official `localgraphclustering` API for true MQI and SimpleLocal refinement.
+- `tests/test_graph.py` — graph construction tests.
+- `tests/test_flow_refinement.py` — validation and integration tests for flow refinement.
+- `experiments/run_baseline.py` — reproducible end-to-end baseline runner.
 
 ### Graph-construction correction
 
-The original workflow allowed scikit-learn to warn that the affinity matrix was asymmetric. The new graph module makes the intended undirected graph explicit through either:
+The graph module explicitly constructs an undirected affinity matrix through either:
 
 - `union`: `A = max(A, Aᵀ)`
 - `mean`: `A = (A + Aᵀ) / 2`
 
-It also reports the number of connected components and degree statistics.
+It also reports connected components and degree statistics. The semantic definition is fixed: **node = network-flow record; edge = feature-space proximity**.
 
-## 4. Dataset
+## 4. True Flow-Based Refinement
+
+The previous notebook used NetworkX `minimum_cut` fallbacks when `localgraphclustering` was unavailable. Those fallbacks are **not equivalent** to the formal MQI/FI/LFI algorithms and must not be reported as such.
+
+The new implementation removes that scientific ambiguity:
+
+- `mqi_refine(...)` calls the published LocalGraphClustering **MQI** implementation.
+- `simple_local_refine(...)` calls its strongly-local **SimpleLocal** method.
+- `refine_from_labels(...)` derives seeds only from an unsupervised baseline clustering; ground-truth labels are not used for seed construction.
+- The graph must be symmetric and seed indices are validated before execution.
+
+The currently inspected `localgraphclustering` API exposes MQI and SimpleLocal through its public package interface. It does **not** expose functions named `FlowImprove` or `LocalFlowImprove`; therefore the project will not fabricate those APIs. If those algorithms are required later, they will be added only after locating and validating a genuine implementation.
+
+## 5. Dataset
 
 The project uses **NSL-KDD**, with the current prototype using binary labels:
 
 - `Normal = 0`
 - `Attack = 1`
 
-The original experiment used one-hot encoding for `protocol_type`, `service`, and `flag`, followed by standardization and PCA.
+The original experiment uses one-hot encoding for `protocol_type`, `service`, and `flag`, followed by standardization and PCA. The current working configuration is 15,000 stratified records, PCA to 50 dimensions and a symmetric k-NN graph with `k=15`.
 
-The repository should not treat the current binary formulation as the final IDS research setting. Attack-family analysis (DoS, Probe, R2L and U2R) is a planned extension.
+This binary formulation is a controlled proof-of-concept, not the final research setting. Attack-family analysis (DoS, Probe, R2L and U2R) remains a planned extension.
 
-## 5. Reproducibility Status
+## 6. Reproducibility Problem Being Investigated
 
-The previous README reported:
+Historical README values were:
 
-| Method | Previously reported F1 |
+| Method | Historical F1 |
 |---|---:|
 | K-Means | 0.8806 |
 | Spectral | 0.9252 |
 | MQI | 0.9255 |
 | LFI | 0.9416 |
 
-These numbers remain historical results. They are **not yet accepted as reproduced research results**.
-
-The notebook's more recent run produced substantially different values, including approximately:
+A later notebook run produced approximately:
 
 | Method | Current notebook F1 |
 |---|---:|
@@ -99,52 +115,76 @@ The notebook's more recent run produced substantially different values, includin
 | FI approximation | 0.5462 |
 | LFI approximation | 0.5462 |
 
-The discrepancy is now treated as a research reproducibility issue rather than hidden. Possible causes include graph construction, graph symmetry, preprocessing, sampling, hyperparameters, and whether the earlier experiment used the actual LocalGraphClustering algorithms.
+These discrepancies are **not being hidden or averaged together**. Historical numbers remain unvalidated until the exact preprocessing, graph construction, algorithms and evaluation protocol are reproduced.
 
-## 6. Critical Scientific Note: MQI / FI / LFI
+## 7. Reproducible Experiment Runner
 
-The current notebook contains fallback approximations based on NetworkX minimum-cut operations. These are **not equivalent to the formal MQI, FlowImprove and LocalFlowImprove algorithms**.
+After installing the pinned dependencies, run:
 
-Therefore, until the `localgraphclustering` implementation is successfully executed and validated:
+```bash
+python -m experiments.run_baseline --data Data/KDDTrain+.txt
+```
 
-> **The project must not claim that the current approximation results are true MQI/FI/LFI results.**
+Optional controls:
 
-This is the highest-priority technical validation task in the next phase.
+```bash
+python -m experiments.run_baseline \
+  --data Data/KDDTrain+.txt \
+  --output results/baseline_mqi.json \
+  --sample-size 15000 \
+  --pca 50 \
+  --k 15
+```
 
-## 7. Research Roadmap
+The runner saves configuration, preprocessing dimensions, PCA explained variance, graph statistics and evaluation metrics as JSON.
 
-### Phase 1 — Reproducibility and correctness ✅ in progress
+**Important:** MQI is a local refinement method, not automatically a generic two-way clustering algorithm. The current runner therefore reports MQI refinement from an unsupervised seed cluster separately rather than pretending it is an independent global partitioner.
 
-- [x] Separate preprocessing from notebook code
-- [x] Centralize experiment parameters
-- [x] Make k-NN graph symmetry explicit
+## 8. Evaluation Protocol
+
+The evaluation layer reports:
+
+- Precision
+- Recall
+- F1
+- Specificity
+- False Positive Rate (FPR)
+- Balanced Accuracy
+- Adjusted Rand Index (ARI)
+- Normalized Mutual Information (NMI)
+- Silhouette score
+- MQI conductance when applicable
+
+Binary cluster-label orientation is aligned **only after prediction for offline evaluation**. Ground-truth labels must never be used to choose clustering seeds in the experiment pipeline.
+
+Silhouette is currently computed in PCA Euclidean space, whereas flow refinement optimizes graph-local structure. These are intentionally different views of cluster quality and should not be conflated.
+
+## 9. Research Roadmap
+
+### Phase 1 — Reproducibility and correctness 🟡
+
+- [x] Modularize preprocessing
+- [x] Centralize parameters
+- [x] Symmetrize k-NN graph explicitly
 - [x] Add graph diagnostics
-- [x] Add IDS-oriented evaluation metrics
-- [x] Add initial unit tests
+- [x] Add IDS metrics
+- [x] Add unit tests
+- [x] Add true MQI integration
 - [ ] Reproduce the exact historical experiment
 
-### Phase 2 — True flow-based algorithms
-
-- [ ] Validate `localgraphclustering==0.6.1` in a clean environment
-- [ ] Replace minimum-cut approximations with the actual MQI / FlowImprove / LocalFlowImprove APIs
-- [ ] Record algorithm parameters and seeds
-- [ ] Re-run all baselines
-- [ ] Explain the 0.925–0.941 historical results versus the current 0.55–0.64 results
-
-### Phase 3 — Systematic graph experiments
+### Phase 2 — Systematic graph experiments
 
 Evaluate:
 
-- k = 5, 10, 15, 20, 30
-- unweighted k-NN
-- weighted k-NN
+- `k = 5, 10, 15, 20, 30`
+- unweighted vs weighted k-NN
+- union vs mean symmetrization
 - mutual k-NN
-- different graph symmetrization rules
-- connected-component structure
+- graph connectivity and degree distribution
 
-Report F1, Precision, Recall, Specificity, FPR, Balanced Accuracy, ARI, NMI and Silhouette.
+Report both predictive and graph-quality metrics.
 
-### Phase 4 — Real-world-oriented improvement
+### Phase 3 — Real-world graph formulation
 
 Move beyond a purely feature-similarity graph by incorporating network-flow structure such as:
 
@@ -155,64 +195,66 @@ Move beyond a purely feature-similarity graph by incorporating network-flow stru
 - bytes and packet statistics
 - local neighborhood behavior
 
-This creates a stronger bridge between the academic graph-clustering formulation and operational IDS.
+This creates a stronger bridge between graph clustering and operational IDS.
 
-### Phase 5 — Innovation
+### Phase 4 — Innovation
 
-Only after the baseline is correct should we introduce a novel method.
+Only after the baseline is validated should a novel method be introduced.
 
 The strongest candidate direction is:
 
 > **Adaptive Flow-Aware Graph Refinement for Network Intrusion Detection**
 
-Potential innovation components:
+Candidate components:
 
-1. adaptive edge weighting using feature similarity + flow statistics + local graph structure;
-2. confidence/uncertainty-aware cluster refinement;
-3. automatic selection of the most informative local seed set;
-4. adaptive choice of k based on local density;
-5. optional reinforcement learning for selecting the next refinement action.
+1. adaptive edge weighting from feature similarity + traffic statistics + local graph structure;
+2. uncertainty-aware refinement;
+3. automatic selection of informative seed nodes;
+4. adaptive local neighborhood size `k`;
+5. optional reinforcement learning for sequential seed/action selection.
 
-The innovation should be evaluated against the validated classical baselines rather than replacing them prematurely.
+The innovation should be compared against the validated classical baseline rather than replacing it prematurely.
 
-## 8. Real-World Relevance
+## 10. Real-World Relevance
 
-This project is close to a genuine operational problem: IDS systems must identify malicious traffic while controlling false positives and computational cost.
+The problem is operationally meaningful: an IDS must detect malicious traffic while controlling false positives, missed attacks and computational cost.
 
-The current NSL-KDD formulation is useful for controlled experiments, but it is not sufficient by itself to claim production readiness. A realistic extension should evaluate newer traffic data, temporal behavior, class imbalance, concept drift and computational scalability.
+NSL-KDD is useful for controlled benchmarking but is insufficient for a production claim. Later validation should consider newer traffic datasets, temporal behavior, class imbalance, concept drift and scalability.
 
-## 9. Project Structure
+## 11. Project Structure
 
 ```text
 FlowBased-Graph-Clustering-for-IDS/
 ├── Data/
 ├── notebooks/
 │   └── Flow_b_Graph_Clust_for_IDS.ipynb
+├── experiments/
+│   └── run_baseline.py
 ├── src/
 │   ├── __init__.py
 │   ├── config.py
 │   ├── preprocessing.py
 │   ├── graph.py
 │   ├── clustering.py
-│   └── evaluation.py
+│   ├── evaluation.py
+│   └── flow_refinement.py
 ├── tests/
-│   └── test_graph.py
+│   ├── test_graph.py
+│   └── test_flow_refinement.py
 ├── results/
 ├── requirements.txt
 └── README.md
 ```
 
-## 10. Technology
+## 12. Scientific Position
 
-Python · NumPy · Pandas · SciPy · Scikit-learn · NetworkX · LocalGraphClustering · Matplotlib · Seaborn · Pytest
+**Current status: a substantially stronger research prototype, but not yet a validated research benchmark.**
 
-## 11. Scientific Position
+The order of work is deliberate:
 
-**Current status: strong course project / promising research prototype, but not yet a validated research benchmark.**
+**correctness → reproducibility → systematic graph experiments → real-world graph formulation → innovation**
 
-The priority is deliberately **correctness → reproducibility → systematic experiments → real-world graph formulation → innovation**.
-
-Adding a novel algorithm before resolving the current MQI/FI/LFI and historical-result discrepancy would make the research claim weaker, not stronger.
+Introducing a novel algorithm before resolving the MQI implementation and historical-result discrepancy would weaken the research claim.
 
 ## Author
 
