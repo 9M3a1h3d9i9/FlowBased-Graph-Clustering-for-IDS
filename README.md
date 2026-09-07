@@ -28,7 +28,7 @@ NSL-KDD
         PCA
           │
           ▼
-   Symmetric k-NN Graph
+   Configurable k-NN Affinity Graph
           │
           ├──────────────┐
           ▼              ▼
@@ -53,22 +53,29 @@ Implemented modules:
 
 - `src/config.py` — centralized experiment configuration and validation.
 - `src/preprocessing.py` — explicit NSL-KDD loading, encoding, scaling and PCA utilities.
-- `src/graph.py` — k-NN graph construction with explicit symmetrization and graph diagnostics.
+- `src/graph.py` — configurable k-NN topology and edge weighting with graph diagnostics.
 - `src/clustering.py` — reusable K-Means and Spectral Clustering baselines.
 - `src/evaluation.py` — Precision, Recall, F1, Specificity, FPR, Balanced Accuracy, ARI and NMI.
 - `src/flow_refinement.py` — integration with the official `localgraphclustering` API for true MQI and SimpleLocal refinement.
-- `tests/test_graph.py` — graph construction tests.
+- `tests/test_graph.py` — graph construction and topology/weighting tests.
 - `tests/test_flow_refinement.py` — validation and integration tests for flow refinement.
 - `experiments/run_baseline.py` — reproducible end-to-end baseline runner.
+- `experiments/sweep_graph.py` — systematic graph-construction ablation runner.
 
 ### Graph-construction correction
 
-The graph module explicitly constructs an undirected affinity matrix through either:
+The graph module explicitly constructs an undirected affinity matrix through:
 
-- `union`: `A = max(A, Aᵀ)`
-- `mean`: `A = (A + Aᵀ) / 2`
+- **union:** `A = max(A, Aᵀ)`
+- **mean:** `A = (A + Aᵀ) / 2`
+- **mutual kNN:** retain only reciprocal nearest-neighbor relations
 
-It also reports connected components and degree statistics. The semantic definition is fixed: **node = network-flow record; edge = feature-space proximity**.
+It now also supports:
+
+- **binary weighting:** unweighted connectivity;
+- **RBF weighting:** Gaussian affinity derived from kNN distances, with a data-adaptive median-distance bandwidth when `sigma` is not supplied.
+
+It reports connected components and degree statistics. The semantic definition remains fixed: **node = network-flow record; edge = feature-space proximity**.
 
 ## 4. True Flow-Based Refinement
 
@@ -91,6 +98,15 @@ The project uses **NSL-KDD**, with the current prototype using binary labels:
 - `Attack = 1`
 
 The original experiment uses one-hot encoding for `protocol_type`, `service`, and `flag`, followed by standardization and PCA. The current working configuration is 15,000 stratified records, PCA to 50 dimensions and a symmetric k-NN graph with `k=15`.
+
+Dataset files currently used by the repository include:
+
+```text
+Data/archive/KDDTrain+.txt
+Data/archive/KDDTest+.txt
+Data/archive/KDDTrain+_20Percent.txt
+Data/archive/KDDTest-21.txt
+```
 
 This binary formulation is a controlled proof-of-concept, not the final research setting. Attack-family analysis (DoS, Probe, R2L and U2R) remains a planned extension.
 
@@ -122,14 +138,14 @@ These discrepancies are **not being hidden or averaged together**. Historical nu
 After installing the pinned dependencies, run:
 
 ```bash
-python -m experiments.run_baseline --data Data/KDDTrain+.txt
+python -m experiments.run_baseline --data Data/archive/KDDTrain+.txt
 ```
 
 Optional controls:
 
 ```bash
 python -m experiments.run_baseline \
-  --data Data/KDDTrain+.txt \
+  --data Data/archive/KDDTrain+.txt \
   --output results/baseline_mqi.json \
   --sample-size 15000 \
   --pca 50 \
@@ -140,7 +156,45 @@ The runner saves configuration, preprocessing dimensions, PCA explained variance
 
 **Important:** MQI is a local refinement method, not automatically a generic two-way clustering algorithm. The current runner therefore reports MQI refinement from an unsupervised seed cluster separately rather than pretending it is an independent global partitioner.
 
-## 8. Evaluation Protocol
+## 8. Phase 2 — Systematic Graph Ablation
+
+The next research step is to determine whether performance is sensitive to the **graph construction itself**, before introducing a novel refinement algorithm.
+
+The sweep now supports four graph dimensions:
+
+1. neighborhood size: `k = 5, 10, 15, 20, 30`;
+2. symmetrization: `union` or `mean`;
+3. topology: ordinary kNN or mutual kNN;
+4. edge weighting: binary or RBF.
+
+Example:
+
+```bash
+python -m experiments.sweep_graph \
+  --data Data/archive/KDDTrain+.txt \
+  --k-values 5 10 15 20 30 \
+  --symmetrizations union mean \
+  --weightings binary rbf \
+  --mutual-options false true \
+  --output results/graph_sweep.csv
+```
+
+This produces a controlled ablation table containing predictive metrics, silhouette score and graph diagnostics such as edge count, connected components and degree statistics.
+
+For a first lightweight run, use fewer settings:
+
+```bash
+python -m experiments.sweep_graph \
+  --data Data/archive/KDDTrain+.txt \
+  --k-values 10 15 20 \
+  --symmetrizations union \
+  --weightings binary rbf \
+  --mutual-options false true
+```
+
+**Methodological rule:** MQI is intentionally not part of this graph-topology sweep. First identify a defensible graph representation; then apply flow refinement to the selected topology in a separate ablation. This prevents graph design and refinement effects from being confounded.
+
+## 9. Evaluation Protocol
 
 The evaluation layer reports:
 
@@ -159,7 +213,11 @@ Binary cluster-label orientation is aligned **only after prediction for offline 
 
 Silhouette is currently computed in PCA Euclidean space, whereas flow refinement optimizes graph-local structure. These are intentionally different views of cluster quality and should not be conflated.
 
-## 9. Research Roadmap
+## 10. Continuous Integration
+
+GitHub Actions now runs the test suite automatically for pushes to `main`, the research branch, and pull requests. This provides a basic regression guard for the research codebase.
+
+## 11. Research Roadmap
 
 ### Phase 1 — Reproducibility and correctness 🟡
 
@@ -172,17 +230,15 @@ Silhouette is currently computed in PCA Euclidean space, whereas flow refinement
 - [x] Add true MQI integration
 - [ ] Reproduce the exact historical experiment
 
-### Phase 2 — Systematic graph experiments
+### Phase 2 — Systematic graph experiments 🟡
 
-Evaluate:
-
-- `k = 5, 10, 15, 20, 30`
-- unweighted vs weighted k-NN
-- union vs mean symmetrization
-- mutual k-NN
-- graph connectivity and degree distribution
-
-Report both predictive and graph-quality metrics.
+- [x] Sweep neighborhood size
+- [x] Compare union vs mean symmetrization
+- [x] Add mutual kNN
+- [x] Add binary vs RBF weighting
+- [x] Record graph connectivity and degree statistics
+- [ ] Execute the full sweep and archive the result table
+- [ ] Identify the statistically stable graph configuration
 
 ### Phase 3 — Real-world graph formulation
 
@@ -215,13 +271,13 @@ Candidate components:
 
 The innovation should be compared against the validated classical baseline rather than replacing it prematurely.
 
-## 10. Real-World Relevance
+## 12. Real-World Relevance
 
 The problem is operationally meaningful: an IDS must detect malicious traffic while controlling false positives, missed attacks and computational cost.
 
 NSL-KDD is useful for controlled benchmarking but is insufficient for a production claim. Later validation should consider newer traffic datasets, temporal behavior, class imbalance, concept drift and scalability.
 
-## 11. Project Structure
+## 13. Project Structure
 
 ```text
 FlowBased-Graph-Clustering-for-IDS/
@@ -229,7 +285,8 @@ FlowBased-Graph-Clustering-for-IDS/
 ├── notebooks/
 │   └── Flow_b_Graph_Clust_for_IDS.ipynb
 ├── experiments/
-│   └── run_baseline.py
+│   ├── run_baseline.py
+│   └── sweep_graph.py
 ├── src/
 │   ├── __init__.py
 │   ├── config.py
@@ -240,13 +297,17 @@ FlowBased-Graph-Clustering-for-IDS/
 │   └── flow_refinement.py
 ├── tests/
 │   ├── test_graph.py
-│   └── test_flow_refinement.py
+│   ├── test_flow_refinement.py
+│   └── test_evaluation.py
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── results/
 ├── requirements.txt
 └── README.md
 ```
 
-## 12. Scientific Position
+## 14. Scientific Position
 
 **Current status: a substantially stronger research prototype, but not yet a validated research benchmark.**
 
@@ -254,7 +315,7 @@ The order of work is deliberate:
 
 **correctness → reproducibility → systematic graph experiments → real-world graph formulation → innovation**
 
-Introducing a novel algorithm before resolving the MQI implementation and historical-result discrepancy would weaken the research claim.
+Introducing a novel algorithm before resolving the MQI implementation, graph-construction sensitivity and historical-result discrepancy would weaken the research claim.
 
 ## Author
 
